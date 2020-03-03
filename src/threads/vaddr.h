@@ -54,14 +54,25 @@ static inline void *pg_round_down (const void *va) {
 
 /* Returns true if VADDR is a user virtual address. */
 static inline bool
-is_user_vaddr (const void *vaddr) 
+is_user_vaddr (const void *vaddr)
 {
-  return vaddr < PHYS_BASE;
+  // Sahithi drove here
+  // check if NULL pointer, or above phys_base, or below code segment
+  // are we supposed to call page fault ????
+  if (vaddr == NULL) {
+    return false;
+  } else if (vaddr >= PHYS_BASE) {
+    return false;
+    // should we pass in this number
+  } else if (vaddr < 0x08048000) {
+    return false;
+  }
+  return true;
 }
 
 /* Returns true if VADDR is a kernel virtual address. */
 static inline bool
-is_kernel_vaddr (const void *vaddr) 
+is_kernel_vaddr (const void *vaddr)
 {
   return vaddr >= PHYS_BASE;
 }
