@@ -31,10 +31,6 @@ process_execute (const char *file_name)
   char *fn_copy;
   tid_t tid;
 
-  // how to limit arguments?
-  char **args;
-  char *progname = strtok_r(file_name, ' ', args);
-
   /* Make a copy of FILE_NAME.
      Otherwise there's a race between the caller and load(). */
   fn_copy = palloc_get_page (0);
@@ -309,8 +305,14 @@ load (const char *file_name, void (**eip) (void), void **esp)
         }
     }
 
+  // make a copy
+  char *fn_copy = palloc_get_page (0);
+  if (fn_copy == NULL)
+    return TID_ERROR;
+  strlcpy (fn_copy, file_name, PGSIZE);
+
   /* Set up stack. */
-  if (!setup_stack (esp))
+  if (!setup_stack (esp, fn_copy))
     goto done;
 
   /* Start address. */
@@ -435,7 +437,7 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
 /* Create a minimal stack by mapping a zeroed page at the top of
    user virtual memory. */
 static bool
-setup_stack (void **esp)
+setup_stack (void **esp, char *filename)
 {
   uint8_t *kpage;
   bool success = false;
@@ -450,6 +452,28 @@ setup_stack (void **esp)
       else
         palloc_free_page (kpage);
     }
+
+    // find where stack starts (one page below PHY_BASE/esp?)
+    // parse filename into individual tokens and add into stack
+    // how to know when we've hit a page worth of args?
+    // how to decrement esp/ what is the use of myEsp?
+    // then realign to word
+    // add pointers to stack from right to left
+    // possible plan: add all the words, when have a pointer pointing
+      // to the top of the stack to find addresses?
+
+    char *token, *save_ptr;
+    int size = 0;
+    char **pointers;
+
+    for (token = strtok_r (filename, " ", &save_ptr); token != NULL;
+                        token = strtok_r (NULL, " ", &save_ptr))
+      {
+        size += strlen(token);
+        if (size > PGSIZE) {
+          return false;
+        }
+      }
   return success;
 }
 
