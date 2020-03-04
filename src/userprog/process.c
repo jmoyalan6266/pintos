@@ -199,7 +199,7 @@ struct Elf32_Phdr
 #define PF_W 2          /* Writable. */
 #define PF_R 4          /* Readable. */
 
-static bool setup_stack (void **esp);
+static bool setup_stack (void **esp, char *filename);
 static bool validate_segment (const struct Elf32_Phdr *, struct file *);
 static bool load_segment (struct file *file, off_t ofs, uint8_t *upage,
                           uint32_t read_bytes, uint32_t zero_bytes,
@@ -464,11 +464,11 @@ setup_stack (void **esp, char *filename)
 
     char *myEsp = (char*) *esp - PGSIZE;
     char *token, *save_ptr;
-    char *limit myEsp - PGSIZE;
-    char **ptrs = malloc(4 * 40);
+    char *ptrs[40];
     int size = PGSIZE;
     int tokenlen;
     int index = 0;
+    int numargs;
 
     for (token = strtok_r (filename, " ", &save_ptr); token != NULL;
                         token = strtok_r (NULL, " ", &save_ptr))
@@ -478,8 +478,7 @@ setup_stack (void **esp, char *filename)
         if (size < 0) {
           return false;
         }
-        **ptrs = myEsp;
-        *ptrs += 4;
+        ptrs[index] = myEsp;
         index++;
         memcpy (myEsp, token, tokenlen);
         myEsp -= tokenlen;
@@ -493,18 +492,30 @@ setup_stack (void **esp, char *filename)
         }
         myEsp -= align;
       }
-    **ptrs = NULL;
-    while (index > 0)
+    ptrs[index] = NULL;
+    numargs = index;
+    while (index >= 0)
       {
-        size -= 8;
+        size -= sizeof(char*);
         if (size < 0) {
           return false;
         }
-        memcpy (myEsp, *ptrs, 8);
-        myEsp -= 8;
-        *ptrs -= 8;
+        memcpy (myEsp, ptrs[index], sizeof(char*));
+        myEsp -= sizeof(char*);
         index--;
       }
+    size -= (sizeof(char*) + sizeof(int) + sizeof(void*));
+    if (size < 0) {
+      return false;
+    }
+    memcpy (myEsp, ptrs, sizeof(char*));
+    myEsp -= sizeof(char*);
+    *myEsp = numargs;
+    myEsp -= sizeof(int);
+    *myEsp = 0x0;
+    myEsp -= sizeof(void*);
+    *esp = myEsp;
+    hex_dump(*esp, *esp, PHYS_BASE - *esp, true);
   return success;
 }
 
