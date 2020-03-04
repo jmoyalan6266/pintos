@@ -448,7 +448,7 @@ setup_stack (void **esp, char *filename)
       success = install_page (((uint8_t *) PHYS_BASE) - PGSIZE, kpage, true);
       if (success)
       // added -12 temporarily
-        *esp = PHYS_BASE - 12;
+        *esp = PHYS_BASE;
       else
         palloc_free_page (kpage);
     }
@@ -462,17 +462,48 @@ setup_stack (void **esp, char *filename)
     // possible plan: add all the words, when have a pointer pointing
       // to the top of the stack to find addresses?
 
+    char *myEsp = (char*) *esp - PGSIZE;
     char *token, *save_ptr;
-    int size = 0;
-    char **pointers;
+    char *limit myEsp - PGSIZE;
+    char **ptrs = malloc(4 * 40);
+    int size = PGSIZE;
+    int tokenlen;
+    int index = 0;
 
     for (token = strtok_r (filename, " ", &save_ptr); token != NULL;
                         token = strtok_r (NULL, " ", &save_ptr))
       {
-        size += strlen(token);
-        if (size > PGSIZE) {
+        tokenlen = strlen(token) + 1;
+        size -= tokenlen;
+        if (size < 0) {
           return false;
         }
+        **ptrs = myEsp;
+        *ptrs += 4;
+        index++;
+        memcpy (myEsp, token, tokenlen);
+        myEsp -= tokenlen;
+      }
+    int align = size % 4;
+    if (align != 0)
+      {
+        size -= align;
+        if (size < 0) {
+          return false;
+        }
+        myEsp -= align;
+      }
+    **ptrs = NULL;
+    while (index > 0)
+      {
+        size -= 8;
+        if (size < 0) {
+          return false;
+        }
+        memcpy (myEsp, *ptrs, 8);
+        myEsp -= 8;
+        *ptrs -= 8;
+        index--;
       }
   return success;
 }
