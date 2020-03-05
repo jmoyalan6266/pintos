@@ -229,9 +229,12 @@ load (const char *file_name, void (**eip) (void), void **esp)
   if (fn_copy2 == NULL)
     return TID_ERROR;
   strlcpy (fn_copy2, file_name, PGSIZE);
-char *save;
+  char *save;
   /* Open executable file. */
-  file = filesys_open (strtok_r (fn_copy2, " ", save));
+  printf("og filename: %s, %s\n", file_name, fn_copy2);
+  char *temp = strtok_r (fn_copy2, " ", &save);
+  printf("filename: %s\n", temp);
+  file = filesys_open (temp);
   //file = filesys_open (file_name);
   if (file == NULL)
     {
@@ -457,6 +460,8 @@ setup_stack (void **esp, char *filename)
         *esp = PHYS_BASE;
       else
         palloc_free_page (kpage);
+
+      printf("in if: %p\n", esp);
     }
 
     // find where stack starts (one page below PHY_BASE/esp?)
@@ -468,9 +473,10 @@ setup_stack (void **esp, char *filename)
     // possible plan: add all the words, when have a pointer pointing
       // to the top of the stack to find addresses?
 
-    char *myEsp = (char*) *esp - PGSIZE;
+    char *myEsp = (char*) *esp;
+    printf("myEsp: %p\n", myEsp);
     char *token, *save_ptr;
-    char *ptrs[40];
+    char *ptrs[128];
     int size = PGSIZE;
     int tokenlen;
     int index = 0;
@@ -479,7 +485,6 @@ setup_stack (void **esp, char *filename)
     for (token = strtok_r (filename, " ", &save_ptr); token != NULL;
                         token = strtok_r (NULL, " ", &save_ptr))
       {
-        // doing +1 for null char at end
         tokenlen = strlen(token) + 1;
         size -= tokenlen;
         if (size < 0) {
@@ -487,9 +492,11 @@ setup_stack (void **esp, char *filename)
         }
         ptrs[index] = myEsp;
         index++;
-        memcpy (myEsp, token, tokenlen);
         myEsp -= tokenlen;
+        memcpy (myEsp, token, tokenlen); 
+        printf("token: %p\n", myEsp);
       }
+    hex_dump(myEsp, myEsp, (PHYS_BASE-(int)myEsp), true);
     int align = size % 4;
     if (align != 0)
       {
@@ -497,6 +504,7 @@ setup_stack (void **esp, char *filename)
         if (size < 0) {
           return false;
         }
+        //write null terminators
         myEsp -= align;
       }
     // NULL or 0?
@@ -508,8 +516,8 @@ setup_stack (void **esp, char *filename)
         if (size < 0) {
           return false;
         }
-        //memcpy (myEsp, &(ptrs[index]), sizeof(char*));
         myEsp -= sizeof(char*);
+        memcpy (myEsp, &(ptrs[index]), sizeof(char*));
         index--;
       }
     // sizeof(char*)?
@@ -517,15 +525,15 @@ setup_stack (void **esp, char *filename)
     if (size < 0) {
       return false;
     }
-    // ptrs?
-    // memcpy (myEsp, ptrs, sizeof(char*));
-    // myEsp -= sizeof(char*);
-    // *myEsp = numargs;
-    // myEsp -= sizeof(int);
-    // *myEsp = 0x0;
-    // myEsp -= sizeof(void*);
-    // *esp = myEsp;
-    hex_dump(*esp, *esp, PHYS_BASE - *esp, true);
+    //ptrs?
+    memcpy (myEsp, ptrs, sizeof(char*));
+    myEsp -= sizeof(char*);
+    *myEsp = numargs;
+    myEsp -= sizeof(int);
+    *myEsp = 0x0;
+    myEsp -= sizeof(void*);
+    *esp = myEsp;
+    //hex_dump(esp, esp, 100, true);
   return success;
 }
 
