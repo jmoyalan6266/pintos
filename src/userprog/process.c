@@ -225,17 +225,17 @@ load (const char *file_name, void (**eip) (void), void **esp)
     goto done;
   process_activate ();
 
+  // Sahithi drove here
+  // copies files and parses name
   char *fn_copy2 = palloc_get_page (0);
   if (fn_copy2 == NULL)
     return TID_ERROR;
   strlcpy (fn_copy2, file_name, PGSIZE);
   char *save;
-  /* Open executable file. */
-  printf("og filename: %s, %s\n", file_name, fn_copy2);
   char *temp = strtok_r (fn_copy2, " ", &save);
-  printf("filename: %s\n", temp);
+
+  /* Open executable file. */
   file = filesys_open (temp);
-  //file = filesys_open (file_name);
   if (file == NULL)
     {
       printf ("load: %s: open failed\n", file_name);
@@ -474,30 +474,34 @@ setup_stack (void **esp, char *filename)
       // to the top of the stack to find addresses?
 
     char *myEsp = (char*) *esp;
-    printf("myEsp: %p\n", myEsp);
     char *token, *save_ptr;
     char *ptrs[128];
     int size = PGSIZE;
     int tokenlen;
     int index = 0;
     int numargs;
+    char nullptr = '0';
+    int i;
 
+    // go through and parse off one arg at a time
     for (token = strtok_r (filename, " ", &save_ptr); token != NULL;
                         token = strtok_r (NULL, " ", &save_ptr))
       {
+        // +1 accounts for null terminating
         tokenlen = strlen(token) + 1;
         size -= tokenlen;
         if (size < 0) {
           return false;
         }
+        // decrement pointer before pushing to stack
+        myEsp -= tokenlen;
+        // store address of current arg
         ptrs[index] = myEsp;
         index++;
-        myEsp -= tokenlen;
-        memcpy (myEsp, token, tokenlen); 
-        printf("token: %p\n", myEsp);
+        memcpy (myEsp, token, tokenlen);
       }
-    hex_dump(myEsp, myEsp, (PHYS_BASE-(int)myEsp), true);
-    int align = size % 4;
+    // check num bytes added to see if we need to align
+    int align = (PGSIZE - size) % 4;
     if (align != 0)
       {
         size -= align;
@@ -505,11 +509,22 @@ setup_stack (void **esp, char *filename)
           return false;
         }
         //write null terminators
-        myEsp -= align;
+        for (i = 0; i < align; i++)
+          {
+            myEsp--;
+            memcpy (myEsp, &nullptr, 1);
+          }
       }
-    // NULL or 0?
-    ptrs[index] = NULL;
+    // pad with 4 nulls for char ptr
+    for (i = 0; i < sizeof(char*); i++)
+      {
+        myEsp--;
+        memcpy (myEsp, &nullptr, 1);
+      }
+    // store total num args
     numargs = index;
+    // fence post: drecrement
+    index--;
     while (index >= 0)
       {
         size -= sizeof(char*);
@@ -517,23 +532,30 @@ setup_stack (void **esp, char *filename)
           return false;
         }
         myEsp -= sizeof(char*);
+        printf("pointer: %p\n", ptrs[index]);
+        // push pointers onto stack
         memcpy (myEsp, &(ptrs[index]), sizeof(char*));
         index--;
       }
-    // sizeof(char*)?
+    // check size of last 3 pushes onto stack
+    // always a char ptr, int, void ptr
     size -= (sizeof(char*) + sizeof(int) + sizeof(void*));
     if (size < 0) {
       return false;
     }
     //ptrs?
-    memcpy (myEsp, ptrs, sizeof(char*));
     myEsp -= sizeof(char*);
-    *myEsp = numargs;
+    memcpy (myEsp, &ptrs, sizeof(char*));
     myEsp -= sizeof(int);
-    *myEsp = 0x0;
-    myEsp -= sizeof(void*);
+    *myEsp = numargs;
+    // push 4 nulls to account for void ptr
+    for (i = 0; i < sizeof(void*); i++)
+      {
+        myEsp--;
+        memcpy (myEsp, &nullptr, 1);
+      }
     *esp = myEsp;
-    //hex_dump(esp, esp, 100, true);
+    hex_dump(myEsp, myEsp, (PHYS_BASE-(int)myEsp), true);
   return success;
 }
 
