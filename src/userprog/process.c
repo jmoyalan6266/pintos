@@ -233,7 +233,6 @@ load (const char *file_name, void (**eip) (void), void **esp)
   strlcpy (fn_copy2, file_name, PGSIZE);
   char *save;
   char *temp = strtok_r (fn_copy2, " ", &save);
-
   /* Open executable file. */
   file = filesys_open (temp);
   if (file == NULL)
@@ -322,9 +321,11 @@ load (const char *file_name, void (**eip) (void), void **esp)
   strlcpy (fn_copy, file_name, PGSIZE);
 
   /* Set up stack. */
-  if (!setup_stack (esp, fn_copy))
-    goto done;
 
+  if (!setup_stack (esp, fn_copy))
+  {
+    goto done;
+  }
   /* Start address. */
   *eip = (void (*) (void)) ehdr.e_entry;
 
@@ -333,6 +334,7 @@ load (const char *file_name, void (**eip) (void), void **esp)
  done:
   /* We arrive here whether the load is successful or not. */
   file_close (file);
+
   return success;
 }
 
@@ -480,7 +482,7 @@ setup_stack (void **esp, char *filename)
     int tokenlen;
     int index = 0;
     int numargs;
-    char nullptr = '0';
+    int nullptr = 0;
     int i;
 
     // go through and parse off one arg at a time
@@ -532,13 +534,14 @@ setup_stack (void **esp, char *filename)
           return false;
         }
         myEsp -= sizeof(char*);
-        printf("pointer: %p\n", ptrs[index]);
+        printf("pointert: %p\n", ptrs[index]);
         // push pointers onto stack
         memcpy (myEsp, &(ptrs[index]), sizeof(char*));
         index--;
       }
     // check size of last 3 pushes onto stack
     // always a char ptr, int, void ptr
+
     size -= (sizeof(char*) + sizeof(int) + sizeof(void*));
     if (size < 0) {
       return false;
@@ -548,6 +551,7 @@ setup_stack (void **esp, char *filename)
     memcpy (myEsp, &ptrs, sizeof(char*));
     myEsp -= sizeof(int);
     *myEsp = numargs;
+
     // push 4 nulls to account for void ptr
     for (i = 0; i < sizeof(void*); i++)
       {
@@ -555,8 +559,10 @@ setup_stack (void **esp, char *filename)
         memcpy (myEsp, &nullptr, 1);
       }
     *esp = myEsp;
+
     hex_dump(myEsp, myEsp, (PHYS_BASE-(int)myEsp), true);
-  return success;
+
+    return success;
 }
 
 /* Adds a mapping from user virtual address UPAGE to kernel
