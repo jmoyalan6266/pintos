@@ -64,7 +64,7 @@ is_user_vaddr (const void *vaddr)
   } else if (vaddr >= PHYS_BASE) {
     return false;
     // should we pass in this number
-  } else if (vaddr < 0x08048000) {
+  } else if (vaddr < (void*) 0x08048000) {
     return false;
   }
   return true;

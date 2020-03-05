@@ -225,8 +225,14 @@ load (const char *file_name, void (**eip) (void), void **esp)
     goto done;
   process_activate ();
 
+  char *fn_copy2 = palloc_get_page (0);
+  if (fn_copy2 == NULL)
+    return TID_ERROR;
+  strlcpy (fn_copy2, file_name, PGSIZE);
+char *save;
   /* Open executable file. */
-  file = filesys_open (file_name);
+  file = filesys_open (strtok_r (fn_copy2, " ", save));
+  //file = filesys_open (file_name);
   if (file == NULL)
     {
       printf ("load: %s: open failed\n", file_name);
@@ -305,6 +311,7 @@ load (const char *file_name, void (**eip) (void), void **esp)
         }
     }
 
+  // Sahithi drove here
   // make a copy
   char *fn_copy = palloc_get_page (0);
   if (fn_copy == NULL)
@@ -447,7 +454,6 @@ setup_stack (void **esp, char *filename)
     {
       success = install_page (((uint8_t *) PHYS_BASE) - PGSIZE, kpage, true);
       if (success)
-      // added -12 temporarily
         *esp = PHYS_BASE;
       else
         palloc_free_page (kpage);
@@ -473,6 +479,7 @@ setup_stack (void **esp, char *filename)
     for (token = strtok_r (filename, " ", &save_ptr); token != NULL;
                         token = strtok_r (NULL, " ", &save_ptr))
       {
+        // doing +1 for null char at end
         tokenlen = strlen(token) + 1;
         size -= tokenlen;
         if (size < 0) {
@@ -492,6 +499,7 @@ setup_stack (void **esp, char *filename)
         }
         myEsp -= align;
       }
+    // NULL or 0?
     ptrs[index] = NULL;
     numargs = index;
     while (index >= 0)
@@ -500,21 +508,23 @@ setup_stack (void **esp, char *filename)
         if (size < 0) {
           return false;
         }
-        memcpy (myEsp, ptrs[index], sizeof(char*));
+        //memcpy (myEsp, &(ptrs[index]), sizeof(char*));
         myEsp -= sizeof(char*);
         index--;
       }
+    // sizeof(char*)?
     size -= (sizeof(char*) + sizeof(int) + sizeof(void*));
     if (size < 0) {
       return false;
     }
-    memcpy (myEsp, ptrs, sizeof(char*));
-    myEsp -= sizeof(char*);
-    *myEsp = numargs;
-    myEsp -= sizeof(int);
-    *myEsp = 0x0;
-    myEsp -= sizeof(void*);
-    *esp = myEsp;
+    // ptrs?
+    // memcpy (myEsp, ptrs, sizeof(char*));
+    // myEsp -= sizeof(char*);
+    // *myEsp = numargs;
+    // myEsp -= sizeof(int);
+    // *myEsp = 0x0;
+    // myEsp -= sizeof(void*);
+    // *esp = myEsp;
     hex_dump(*esp, *esp, PHYS_BASE - *esp, true);
   return success;
 }
