@@ -466,6 +466,8 @@ setup_stack (void **esp, char *filename)
       printf("in if: %p\n", esp);
     }
 
+    // Sahithi drove here
+
     // find where stack starts (one page below PHY_BASE/esp?)
     // parse filename into individual tokens and add into stack
     // how to know when we've hit a page worth of args?
@@ -503,7 +505,7 @@ setup_stack (void **esp, char *filename)
         memcpy (myEsp, token, tokenlen);
       }
     // check num bytes added to see if we need to align
-    int align = (PGSIZE - size) % 4;
+    int align = (unsigned int) myEsp % 4;
     if (align != 0)
       {
         size -= align;
@@ -511,11 +513,11 @@ setup_stack (void **esp, char *filename)
           return false;
         }
         //write null terminators
-        for (i = 0; i < align; i++)
-          {
-            myEsp--;
-            memcpy (myEsp, &nullptr, 1);
-          }
+        //for (i = 0; i < align; i++)
+        //  {
+            myEsp-= align;
+          //  memcpy (myEsp, &nullptr, 1);
+          //}
       }
     // pad with 4 nulls for char ptr
     for (i = 0; i < sizeof(char*); i++)
@@ -534,7 +536,6 @@ setup_stack (void **esp, char *filename)
           return false;
         }
         myEsp -= sizeof(char*);
-        printf("pointert: %p\n", ptrs[index]);
         // push pointers onto stack
         memcpy (myEsp, &(ptrs[index]), sizeof(char*));
         index--;
