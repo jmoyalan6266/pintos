@@ -480,12 +480,14 @@ setup_stack (void **esp, char *filename)
     char *myEsp = (char*) *esp;
     char *token, *save_ptr;
     char *ptrs[128];
+    char *argptr;
     int size = PGSIZE;
     int tokenlen;
     int index = 0;
     int numargs;
     int nullptr = 0;
     int i;
+
 
     // go through and parse off one arg at a time
     for (token = strtok_r (filename, " ", &save_ptr); token != NULL;
@@ -501,6 +503,7 @@ setup_stack (void **esp, char *filename)
         myEsp -= tokenlen;
         // store address of current arg
         ptrs[index] = myEsp;
+        //delete temp later
         index++;
         memcpy (myEsp, token, tokenlen);
       }
@@ -513,11 +516,7 @@ setup_stack (void **esp, char *filename)
           return false;
         }
         //write null terminators
-        //for (i = 0; i < align; i++)
-        //  {
-            myEsp-= align;
-          //  memcpy (myEsp, &nullptr, 1);
-          //}
+        myEsp-= align;
       }
     // pad with 4 nulls for char ptr
     for (i = 0; i < sizeof(char*); i++)
@@ -529,6 +528,7 @@ setup_stack (void **esp, char *filename)
     numargs = index;
     // fence post: drecrement
     index--;
+
     while (index >= 0)
       {
         size -= sizeof(char*);
@@ -540,6 +540,7 @@ setup_stack (void **esp, char *filename)
         memcpy (myEsp, &(ptrs[index]), sizeof(char*));
         index--;
       }
+    argptr = myEsp;
     // check size of last 3 pushes onto stack
     // always a char ptr, int, void ptr
 
@@ -547,9 +548,8 @@ setup_stack (void **esp, char *filename)
     if (size < 0) {
       return false;
     }
-    //ptrs?
     myEsp -= sizeof(char*);
-    memcpy (myEsp, &ptrs, sizeof(char*));
+    memcpy (myEsp, &argptr, sizeof(char*));
     myEsp -= sizeof(int);
     *myEsp = numargs;
 
