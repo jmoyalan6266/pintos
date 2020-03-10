@@ -89,7 +89,9 @@ int
 process_wait (tid_t child_tid UNUSED)
 {
   // temporarily add infinite loop
+  int c_exit = 0;
   thread *curr = thread_current();
+  //check to see if child with given tid exists
   for (e = list_begin (&children); e != list_end (&children); e = list_next (e))
     {
       struct thread *child = list_entry (e, struct thread, c_elem);
@@ -97,21 +99,25 @@ process_wait (tid_t child_tid UNUSED)
         break;
       }
     }
+    //if no child return -1
   if (e != list_end (&children)) {
     return -1;
   }
+  //blocks until child exits
   sema_down(&(curr->sema));
-
-  return -1;
+  c_exit = child->exit;
+  //unblocks any zombie children
+  sema_up(&(child->c_sema));
+  return c_exit;
 }
 
 /* Free the current process's resources. */
 void
 process_exit (void)
 {
+
   struct thread *cur = thread_current ();
   uint32_t *pd;
-
   /* Destroy the current process's page directory and switch back
      to the kernel-only page directory. */
   pd = cur->pagedir;

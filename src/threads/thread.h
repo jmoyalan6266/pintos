@@ -100,6 +100,9 @@ struct thread
     //list and list elem for children
     struct list_elem c_elem;
     struct list children;
+    struct semaphore sema = 0;
+    struct semaphore c_sema = 0;
+    int exit = -1;
 
 
 #ifdef USERPROG

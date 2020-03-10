@@ -71,6 +71,15 @@ halt (void)
 void
 exit (int status)
 {
+  thread *curr = thread_current();
+  //gets parent thread
+  thread *parent = curr->parent;
+  //unblocks parent thread
+  sema_up(&(parent->sema));
+  //need to find a way to check if parent is still alive
+  if (parent->)
+  //blocks until parent calls wait()
+  sema_down(&(curr->c_sema));
   syscall1 (SYS_EXIT, status);
   NOT_REACHED ();
 }
@@ -84,7 +93,7 @@ exec (const char *file)
 int
 wait (pid_t pid)
 {
-  
+
   return syscall1 (SYS_WAIT, pid);
 }
 
@@ -121,6 +130,15 @@ read (int fd, void *buffer, unsigned size)
 int
 write (int fd, const void *buffer, unsigned size)
 {
+  //need to check if buffer and size is within range
+  if (!isValid(void *) buffer + size)) {
+    exit(-1);
+  }
+
+  //need to check if fd wants us to write to file or
+  //to stdout
+
+  //return the size
   return syscall3 (SYS_WRITE, fd, buffer, size);
 }
 
@@ -182,4 +200,9 @@ int
 inumber (int fd)
 {
   return syscall1 (SYS_INUMBER, fd);
+}
+
+bool
+isValid(const void *userpoint) {
+  return is_user_vaddr (userpoint);
 }
