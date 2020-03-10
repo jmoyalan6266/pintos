@@ -89,9 +89,19 @@ int
 process_wait (tid_t child_tid UNUSED)
 {
   // temporarily add infinite loop
-  while (1) {
-
+  thread *curr = thread_current();
+  for (e = list_begin (&children); e != list_end (&children); e = list_next (e))
+    {
+      struct thread *child = list_entry (e, struct thread, c_elem);
+      if (child->tid == tid) {
+        break;
+      }
+    }
+  if (e != list_end (&children)) {
+    return -1;
   }
+  sema_down(&(curr->sema));
+
   return -1;
 }
 

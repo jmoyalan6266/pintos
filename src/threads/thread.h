@@ -73,7 +73,7 @@ typedef int tid_t;
    an assertion failure in thread_current(), which checks that
    the `magic' member of the running thread's `struct thread' is
    set to THREAD_MAGIC.  Stack overflow will normally change this
-   value, triggering the assertion.  (So don't add elements below 
+   value, triggering the assertion.  (So don't add elements below
    THREAD_MAGIC.)
 */
 /* The `elem' member has a dual purpose.  It can be an element in
@@ -94,6 +94,13 @@ struct thread
 
     /* Shared between thread.c and synch.c. */
     struct list_elem elem;              /* List element. */
+
+    //stores parent thread
+    struct thread parent;
+    //list and list elem for children
+    struct list_elem c_elem;
+    struct list children;
+
 
 #ifdef USERPROG
     /* Owned by userprog/process.c. */
