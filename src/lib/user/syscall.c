@@ -69,7 +69,7 @@ halt (void)
 }
 
 void
-exit (int status)
+exit (int status)exit
 {
   thread *curr = thread_current();
   //gets parent thread
@@ -80,6 +80,7 @@ exit (int status)
   if (parent->)
   //blocks until parent calls wait()
   sema_down(&(curr->c_sema));
+  process_exit();
   syscall1 (SYS_EXIT, status);
   NOT_REACHED ();
 }
