@@ -92,7 +92,7 @@ process_wait (tid_t child_tid UNUSED)
   int c_exit = 0;
   thread *curr = thread_current();
   //check to see if child with given tid exists
-  for (e = list_begin (&children); e != list_end (&children); e = list_next (e))
+  for (e = list_begin (&curr->children); e != list_end (&curr->children); e = list_next (e))
     {
       struct thread *child = list_entry (e, struct thread, c_elem);
       if (child->tid == tid) {
@@ -104,10 +104,17 @@ process_wait (tid_t child_tid UNUSED)
     return -1;
   }
   //blocks until child exits
-  sema_down(&(curr->sema));
+  sema_down(&(child->c_sema1));
   c_exit = child->exit;
   //unblocks any zombie children
-  sema_up(&(child->c_sema));
+  for (e = list_begin (&curr->children); e != list_end (&curr->children); e = list_next (e))
+    {
+      //struct thread *temp = list_entry (e, struct thread, c_elem);
+      sema_up(&(e->c_sema2));
+      if (e->tid == tid) {
+          list_remove (&children->e);
+      }
+    }
   return c_exit;
 }
 

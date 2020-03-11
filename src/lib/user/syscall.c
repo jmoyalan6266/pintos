@@ -73,13 +73,11 @@ exit (int status)exit
 {
   thread *curr = thread_current();
   //gets parent thread
-  thread *parent = curr->parent;
   //unblocks parent thread
-  sema_up(&(parent->sema));
+  sema_up(&(curr->c_sema1));
   //need to find a way to check if parent is still alive
-  if (parent->)
   //blocks until parent calls wait()
-  sema_down(&(curr->c_sema));
+  sema_down(&(curr->c_sema2));
   process_exit();
   syscall1 (SYS_EXIT, status);
   NOT_REACHED ();
@@ -94,7 +92,7 @@ exec (const char *file)
 int
 wait (pid_t pid)
 {
-
+  process_wait();
   return syscall1 (SYS_WAIT, pid);
 }
 
