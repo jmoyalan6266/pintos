@@ -1,6 +1,13 @@
 #include <syscall.h>
+#include <list.h>
 #include "../syscall-nr.h"
-
+#include "threads/synch.h"
+#include "threads/thread.h"
+#include "threads/flags.h"
+#include "threads/init.h"
+#include "threads/interrupt.h"
+#include "threads/palloc.h"
+#include "threads/vaddr.h"
 /* Invokes syscall NUMBER, passing no arguments, and returns the
    return value as an `int'. */
 #define syscall0(NUMBER)                                        \
@@ -69,18 +76,25 @@ halt (void)
 }
 
 void
-exit (int status)exit
+exit (int status)
 {
-  thread *curr = thread_current();
+  struct list_elem *e;
+  struct thread *curr = thread_current();
   //gets parent thread
   //unblocks parent thread
   sema_up(&(curr->c_sema1));
   //need to find a way to check if parent is still alive
   //blocks until parent calls wait()
   sema_down(&(curr->c_sema2));
+  for (e = list_begin (&curr->children); e != list_end (&curr->children); e = list_next (e))
+    {
+      list_remove(&e);
+      //sema_up(&(e->c_sema2)
+      //free all of threads current children
+    }
   process_exit();
-  syscall1 (SYS_EXIT, status);
-  NOT_REACHED ();
+//  syscall1 (SYS_EXIT, status);
+//  NOT_REACHED ();
 }
 
 pid_t
@@ -92,8 +106,8 @@ exec (const char *file)
 int
 wait (pid_t pid)
 {
-  process_wait();
-  return syscall1 (SYS_WAIT, pid);
+return  process_wait();
+//  return syscall1 (SYS_WAIT, pid);
 }
 
 bool
@@ -130,9 +144,7 @@ int
 write (int fd, const void *buffer, unsigned size)
 {
   //need to check if buffer and size is within range
-  if (!isValid(void *) buffer + size)) {
-    exit(-1);
-  }
+
 
   //need to check if fd wants us to write to file or
   //to stdout
@@ -201,7 +213,7 @@ inumber (int fd)
   return syscall1 (SYS_INUMBER, fd);
 }
 
-bool
-isValid(const void *userpoint) {
-  return is_user_vaddr (userpoint);
-}
+// bool
+// isValid(const void *userpoint) {
+//   return is_user_vaddr (userpoint);
+// }

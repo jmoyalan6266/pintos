@@ -17,6 +17,7 @@
 #include "threads/palloc.h"
 #include "threads/thread.h"
 #include "threads/vaddr.h"
+#include "threads/synch.h"
 
 static thread_func start_process NO_RETURN;
 static bool load (const char *cmdline, void (**eip) (void), void **esp);
@@ -109,12 +110,15 @@ process_wait (tid_t child_tid UNUSED)
   sema_down(&(child->c_sema1));
   c_exit = child->exit;
   //unblocks any zombie children
+  sema_up(&(child->c_sema2));
   for (e = list_begin (&curr->children); e != list_end (&curr->children); e = list_next (e))
     {
       struct thread *temp = list_entry (e, struct thread, c_elem);
       //sema_up(&(e->c_sema2));
+      //remove from list
       if (temp->tid == child_tid) {
-          list_remove (&children->e);
+          //temps = temp->c_elem;
+          list_remove (&e);
       }
     }
   return c_exit;
