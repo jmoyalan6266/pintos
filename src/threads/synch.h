@@ -1,7 +1,7 @@
 #ifndef THREADS_SYNCH_H
 #define THREADS_SYNCH_H
 
-#include <lib/kernel/list.h>
+#include <list.h>
 #include <stdbool.h>
 
 /* A counting semaphore. */
@@ -42,7 +42,6 @@ void cond_signal (struct condition *, struct lock *);
 void cond_broadcast (struct condition *, struct lock *);
 
 /* Optimization barrier.
-
    The compiler will not reorder operations across an
    optimization barrier.  See "Optimization Barriers" in the
    reference guide for more information.*/

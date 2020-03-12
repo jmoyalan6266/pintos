@@ -114,10 +114,8 @@ process_wait (tid_t child_tid UNUSED)
   for (e = list_begin (&curr->children); e != list_end (&curr->children); e = list_next (e))
     {
       struct thread *temp = list_entry (e, struct thread, c_elem);
-      //sema_up(&(e->c_sema2));
       //remove from list
       if (temp->tid == child_tid) {
-          //temps = temp->c_elem;
           list_remove (&e);
       }
     }
