@@ -104,6 +104,9 @@ struct thread
     struct semaphore c_sema2;
     int exit;
 
+    //for write
+    char *fileDir[128];
+
 
 #ifdef USERPROG
     /* Owned by userprog/process.c. */
