@@ -86,8 +86,10 @@ start_process (void *file_name_)
 
    This function will be implemented in problem 2-2.  For now, it
    does nothing. */
+
+//got rid of UNUSED
 int
-process_wait (tid_t child_tid UNUSED)
+process_wait (tid_t child_tid)
 {
   // temporarily add infinite loop
   int c_exit = 0;
@@ -103,7 +105,7 @@ process_wait (tid_t child_tid UNUSED)
       }
     }
     //if no child return -1
-  if (e != list_end (&curr->children)) {
+  if (e == list_end (&curr->children)) {
     return -1;
   }
   //blocks until child exits

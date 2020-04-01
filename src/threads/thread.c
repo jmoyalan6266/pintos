@@ -283,6 +283,21 @@ void
 thread_exit (void)
 {
   ASSERT (!intr_context ());
+  struct list_elem *e;
+  struct thread *curr = thread_current();
+  //gets parent thread
+  //unblocks parent thread
+  sema_up(&(curr->c_sema1));
+  //need to find a way to check if parent is still alive
+  //blocks until parent calls wait()
+  sema_down(&(curr->c_sema2));
+  for (e = list_begin (&curr->children); e != list_end (&curr->children); e = list_next (e))
+    {
+      struct thread *temp = list_entry (e, struct thread, c_elem);
+      sema_up(&(temp->c_sema2));
+      list_remove(e);
+      //free all of threads current children
+    }
 
 #ifdef USERPROG
   process_exit ();
