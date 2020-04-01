@@ -112,15 +112,9 @@ process_wait (tid_t child_tid)
   sema_down(&(child->c_sema1));
   c_exit = child->exit;
   //unblocks any zombie children
+  //remove from list
+  list_remove (&e);
   sema_up(&(child->c_sema2));
-  for (e = list_begin (&curr->children); e != list_end (&curr->children); e = list_next (e))
-    {
-      struct thread *temp = list_entry (e, struct thread, c_elem);
-      //remove from list
-      if (temp->tid == child_tid) {
-          list_remove (&e);
-      }
-    }
   return c_exit;
 }
 
@@ -492,7 +486,6 @@ setup_stack (void **esp, char *filename)
       else
         palloc_free_page (kpage);
 
-      printf("in if: %p\n", esp);
     }
 
     // Sahithi drove here
@@ -590,7 +583,7 @@ setup_stack (void **esp, char *filename)
       }
     *esp = myEsp;
 
-    hex_dump(myEsp, myEsp, (PHYS_BASE-(int)myEsp), true);
+    //hex_dump(myEsp, myEsp, (PHYS_BASE-(int)myEsp), true);
 
     return success;
 }

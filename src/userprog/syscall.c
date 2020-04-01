@@ -16,6 +16,8 @@ tid_t exec (const char *cmd_line);
 int write (int fd, const void *buffer, unsigned size);
 void exit (int status);
 int wait (tid_t pid);
+bool create (const char *file, unsigned initial_size);
+bool remove (const char *file);
 struct lock lock;
 
 void
@@ -49,7 +51,7 @@ syscall_handler (struct intr_frame *f UNUSED)
       myEsp++;
       int fd = *myEsp;
       myEsp++;
-      void* buffer = *myEsp;
+      void* buffer = (void*)*myEsp;
       myEsp++;
       unsigned size = *myEsp;
       f->eax = write (fd, buffer, size);
@@ -59,8 +61,20 @@ syscall_handler (struct intr_frame *f UNUSED)
       const char *cmd_line = *myEsp;
       f->eax = exec(cmd_line);
       break;
+    case SYS_CREATE:
+      myEsp++;
+      const char *file = *myEsp;
+      myEsp++;
+      unsigned initial_size = *myEsp;
+      f->eax = create(file, initial_size);
+      break;
+    case SYS_REMOVE:
+      myEsp++;
+      const char *file1 = *myEsp;
+      f->eax = remove(file1);
+      break;
+
   }
-  printf ("system call!\n");
   thread_exit ();
 }
 
@@ -108,23 +122,7 @@ write (int fd, const void *buffer, unsigned size)
   {
      noBytes = 0;
      struct file *file = curr->fileDir[fd];
-     int  bytesWritten = 0;
-     while (size >= 128)
-     {
-        bytesWritten = (int)file_write(file, buffer, 128);
-        noBytes += bytesWritten;
-        if(bytesWritten == 0)
-        {
-          break;
-        }
-        size -= 128;
-        buffer += 128;
-     }
-     if(size > 0 && bytesWritten != 0)
-     {
-       noBytes += (int)file_write(file, buffer, size);
-     }
-    
+     noBytes = (int)file_write(file, buffer, size);
   }
   lock_release(&lock);
   return noBytes;
@@ -134,7 +132,6 @@ write (int fd, const void *buffer, unsigned size)
 tid_t 
 exec (const char *cmd_line)
 {
-  struct thread *curr = thread_current();
   lock_acquire(&lock);
   tid_t tid = process_execute(cmd_line);
   if(tid == TID_ERROR)
@@ -143,16 +140,6 @@ exec (const char *cmd_line)
     //change to macro
     return -1;
   }
-  struct list_elem *e;
-  for (e = list_begin (&all_list); e != list_end (&all_list); e = list_next (e))
-  {
-    struct thread *temp = list_entry (e, struct thread, allelem);
-    if(temp->tid == tid)
-    {
-      break;
-    }
-  }
-  list_push_back (&curr->children, &temp->c_elem);
   lock_release(&lock);
 }
 
@@ -160,4 +147,24 @@ void
 halt (void)
 {
   shutdown_power_off();
+}
+
+bool
+create (const char *file, unsigned initial_size)
+{
+  bool returnVal;
+  lock_acquire(&lock);
+  returnVal = filesys_create(file, initial_size);
+  lock_release(&lock);
+  return returnVal;
+}
+
+bool
+remove (const char *file)
+{
+  bool returnVal;
+  lock_acquire(&lock);
+  returnVal = filesys_remove(file);
+  lock_release(&lock);
+  return returnVal;
 }
