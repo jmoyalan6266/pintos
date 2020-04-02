@@ -42,9 +42,18 @@ process_execute (const char *file_name)
   // synchonize load and exectute
   // plan to use semaphores to lock it
   // do we needa add it to thread struct
+  
 
   /* Create a new thread to execute FILE_NAME. */
   tid = thread_create (file_name, PRI_DEFAULT, start_process, fn_copy);
+  
+  // struct thread *curr = thread_current();
+  // sema_down(&curr->le_sema);
+  // if (!curr->le_pass)
+  // {
+  //   return -1;
+  // }
+
   if (tid == TID_ERROR)
     palloc_free_page (fn_copy);
   return tid;
@@ -58,6 +67,7 @@ start_process (void *file_name_)
   char *file_name = file_name_;
   struct intr_frame if_;
   bool success;
+  struct thread *curr = thread_current();
 
   /* Initialize interrupt frame and load executable. */
   memset (&if_, 0, sizeof if_);
@@ -65,6 +75,8 @@ start_process (void *file_name_)
   if_.cs = SEL_UCSEG;
   if_.eflags = FLAG_IF | FLAG_MBS;
   success = load (file_name, &if_.eip, &if_.esp);
+  curr->le_pass = success;
+  sema_up(&curr->le_sema);
 
   /* If load failed, quit. */
   palloc_free_page (file_name);

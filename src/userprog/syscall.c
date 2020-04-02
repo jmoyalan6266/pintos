@@ -1,6 +1,8 @@
 #include "userprog/syscall.h"
 #include "userprog/process.h"
+#include "userprog/pagedir.h"
 #include <stdio.h>
+#include <string.h>
 #include <syscall-nr.h>
 #include "threads/interrupt.h"
 #include "threads/thread.h"
@@ -11,6 +13,7 @@
 #include "filesys/off_t.h"
 #include "filesys/file.h"
 #include "filesys/filesys.h"
+
 
 static void syscall_handler (struct intr_frame *);
 void halt (void);
@@ -28,6 +31,9 @@ int open (const char *file);
 int filesize (int fd);
 struct lock lock;
 
+// helper
+bool check_valid(char* cmd_line);
+
 void
 syscall_init (void)
 {
@@ -44,6 +50,7 @@ syscall_handler (struct intr_frame *f UNUSED)
   char* file;
   void* buffer;
   unsigned size;
+  printf("ESP: %d\n", *myEsp);
   switch(*myEsp)
   {
     case SYS_HALT:
@@ -54,24 +61,15 @@ syscall_handler (struct intr_frame *f UNUSED)
       int status = *myEsp;
       exit (status);
       break;
-    case SYS_WAIT:  
-      myEsp++;
-      tid_t pid = *myEsp;
-      f->eax = wait (pid);
-      break;
-    case SYS_WRITE:
-      myEsp++;
-      fd = *myEsp;
-      myEsp++;
-      buffer = (void*)*myEsp;
-      myEsp++;
-      size = *myEsp;
-      f->eax = write (fd, buffer, size);
-      break;
     case SYS_EXEC:
       myEsp++;
       char *cmd_line = (char *)*myEsp;
       f->eax = exec(cmd_line);
+      break;
+    case SYS_WAIT:  
+      myEsp++;
+      tid_t pid = *myEsp;
+      f->eax = wait (pid);
       break;
     case SYS_CREATE:
       myEsp++;
@@ -85,27 +83,15 @@ syscall_handler (struct intr_frame *f UNUSED)
       file = (char *)*myEsp;
       f->eax = remove(file);
       break;
-    case SYS_TELL:
+    case SYS_OPEN:
       myEsp++;
-      fd = *myEsp;
-      f->eax = tell(fd);
-      break;
-    case SYS_SEEK:
-      myEsp++;
-      fd = *myEsp;
-      myEsp++;
-      unsigned position = *myEsp;
-      seek(fd, position);
+      file = (char*)*myEsp;
+      f->eax = open (file);
       break;
     case SYS_FILESIZE:
       myEsp++;
       fd = *myEsp;
       f->eax = filesize(fd);
-      break;
-    case SYS_CLOSE:
-      myEsp++;
-      fd = *myEsp;
-      close(fd);
       break;
     case SYS_READ:
       myEsp++;
@@ -116,20 +102,39 @@ syscall_handler (struct intr_frame *f UNUSED)
       size = *myEsp;
       f->eax = read (fd, buffer, size);
       break;
-    case SYS_OPEN:
+    case SYS_WRITE:
       myEsp++;
-      file = (char*)*myEsp;
-      f->eax = open (file);
+      fd = *myEsp;
+      myEsp++;
+      buffer = (void*)*myEsp;
+      myEsp++;
+      size = *myEsp;
+      f->eax = write (fd, buffer, size);
+      break;
+    case SYS_SEEK:
+      myEsp++;
+      fd = *myEsp;
+      myEsp++;
+      unsigned position = *myEsp;
+      seek(fd, position);
+      break;
+    case SYS_TELL:
+      myEsp++;
+      fd = *myEsp;
+      f->eax = tell(fd);
+      break;
+    case SYS_CLOSE:
+      myEsp++;
+      fd = *myEsp;
+      close(fd);
       break;
   }
-  thread_exit ();
 }
 
-int
-wait (tid_t pid)
+void 
+halt (void)
 {
-  int ret = process_wait(pid);
-  return ret;
+  shutdown_power_off();
 }
 
 void
@@ -137,50 +142,30 @@ exit (int status)
 {
   struct thread *curr = thread_current();
   curr->exit = status;
+  char* save_ptr;
+  char* name_cpy = strtok_r (curr->name, " ", &save_ptr);
+  printf ("%s: exit(%d)\n", name_cpy, status);
   thread_exit();
-}
-
-int
-write (int fd, const void *buffer, unsigned size)
-{
-  int noBytes;
-  //checks to see if it is a valid address
-  if (!is_user_vaddr(buffer) || (fd < 0 || fd > 127))
-  {
-    exit(-1);
-  }
-  lock_acquire(&lock);
-  struct thread *curr = thread_current();
-  if(fd == 1)
-  {
-    while(size >= 128)
-    {
-      putbuf((char*)buffer, 128);
-      size -= 128;
-      buffer += 128;
-    }
-    if(size > 0)
-    {
-      putbuf((char*)buffer, size);
-    }
-    noBytes = size;
-  }
-  else 
-  {
-     noBytes = 0;
-     struct file *file = curr->fileDir[fd];
-     noBytes = (int)file_write(file, buffer, size);
-  }
-  lock_release(&lock);
-  return noBytes;
 }
 
 //pid_t -> why not this
 tid_t 
 exec (const char *cmd_line)
 {
+  if (!check_valid(cmd_line)) 
+  {
+    return -1;
+  }
   lock_acquire(&lock);
   tid_t tid = process_execute(cmd_line);
+  struct thread *curr = thread_current();
+  sema_down(&curr->le_sema);
+  if (!curr->le_pass)
+  {
+    lock_release(&lock);
+    return -1;
+  }
+
   if(tid == TID_ERROR)
   {
     lock_release(&lock);
@@ -191,15 +176,20 @@ exec (const char *cmd_line)
   return tid;
 }
 
-void 
-halt (void)
+int
+wait (tid_t pid)
 {
-  shutdown_power_off();
+  int ret = process_wait(pid);
+  return ret;
 }
 
 bool
 create (const char *file, unsigned initial_size)
 {
+  if (!check_valid(file)) 
+  {
+    return -1;
+  }
   bool returnVal;
   lock_acquire(&lock);
   returnVal = filesys_create(file, initial_size);
@@ -210,6 +200,10 @@ create (const char *file, unsigned initial_size)
 bool
 remove (const char *file)
 {
+  if (!check_valid(file)) 
+  {
+    return -1;
+  }
   bool returnVal;
   lock_acquire(&lock);
   returnVal = filesys_remove(file);
@@ -217,119 +211,13 @@ remove (const char *file)
   return returnVal;
 }
 
-unsigned
-tell (int fd)
-{
-  if (fd < 0 || fd > 127)
-  {
-    return -1;
-  }
-  lock_acquire(&lock);
-  struct thread *curr = thread_current(); 
-  struct file *file = curr->fileDir[fd];
-  if (file == NULL)
-  {
-    lock_release(&lock);
-    return -1;
-  }
-  unsigned ret = file_tell(file);
-  lock_release(&lock);
-  return ret;
-}
-
-void
-seek (int fd, unsigned position)
-{
-  if (fd < 0 || fd > 127)
-  {
-    exit(-1);
-  }
-  lock_acquire(&lock);
-  struct thread *curr = thread_current(); 
-  struct file *file = curr->fileDir[fd];
-  if (file == NULL)
-  {
-    lock_release(&lock);
-    exit(-1);
-  }
-  file_seek(file, position);
-  lock_release(&lock);
-}
-
-void 
-close (int fd)
-{
-  //checks for valid fd
-  if (fd < 2 || fd > 127)
-  {
-    exit(-1);
-  }
-  lock_acquire(&lock);
-  struct thread *curr = thread_current();
-  struct file *file = curr->fileDir[fd];
-  if (file == NULL)
-  {
-    lock_release(&lock);
-    exit(-1);
-  }
-  file_close(file);
-  curr->fileDir[fd] = NULL;
-  lock_release(&lock);
-}
-
-int
-filesize (int fd)
-{
-  if (fd < 2 || fd > 127)
-  {
-    return -1;
-  }
-  lock_acquire(&lock);
-  struct thread *curr = thread_current();
-  struct file *file = curr->fileDir[fd];
-  if (file == NULL)
-  {
-    lock_release(&lock);
-    return -1;
-  }
-  int retVal = (int)file_length(file);
-  lock_release(&lock);
-  return retVal;
-}
-
-int
-read (int fd, void* buffer, unsigned size)
-{
-  int noBytes = 0;
-  //checks to see if it is a valid address
-  if (!is_user_vaddr(buffer) || (fd < 0 || fd > 127))
-  {
-    exit(-1);
-  }
-  lock_acquire(&lock);
-  struct thread *curr = thread_current();
-  int i;
-  if(fd == 1)
-  {
-    for (i = 0; i < size; i++)
-    {
-      //TODO: what to do with input_getc()
-      input_getc();
-      noBytes++;
-    }
-  }
-  else 
-  {
-     struct file *file = curr->fileDir[fd];
-     noBytes = (int)file_read(file, buffer, size);
-  }
-  lock_release(&lock);
-  return noBytes;
-}
-
 int
 open (const char *file)
 {
+  if (!check_valid(file)) 
+  {
+    return -1;
+  }
   bool notFound = 1;
   int index = 2;
   lock_acquire(&lock);
@@ -362,4 +250,162 @@ open (const char *file)
   }
   lock_release(&lock);
   return index;
+}
+
+int
+filesize (int fd)
+{
+  if (fd < 2 || fd > 127)
+  {
+    return -1;
+  }
+  lock_acquire(&lock);
+  struct thread *curr = thread_current();
+  struct file *file = curr->fileDir[fd];
+  if (file == NULL)
+  {
+    lock_release(&lock);
+    return -1;
+  }
+  int retVal = (int)file_length(file);
+  lock_release(&lock);
+  return retVal;
+}
+
+int
+read (int fd, void* buffer, unsigned size)
+{
+  if (!check_valid(buffer) || (fd < 0 || fd > 127)) 
+  {
+    return -1;
+  }
+  int noBytes = 0;
+  lock_acquire(&lock);
+  struct thread *curr = thread_current();
+  int i;
+  if(fd == 1)
+  {
+    for (i = 0; i < size; i++)
+    {
+      //TODO: what to do with input_getc()
+      input_getc();
+      noBytes++;
+    }
+  }
+  else 
+  {
+     struct file *file = curr->fileDir[fd];
+     noBytes = (int)file_read(file, buffer, size);
+  }
+  lock_release(&lock);
+  return noBytes;
+}
+
+int
+write (int fd, const void *buffer, unsigned size)
+{
+  if (!check_valid(buffer) || (fd < 0 || fd > 127)) 
+  {
+    return -1;
+  }
+  int noBytes;
+  lock_acquire(&lock);
+  struct thread *curr = thread_current();
+  if(fd == 1)
+  {
+    while(size >= 128)
+    {
+      putbuf((char*)buffer, 128);
+      size -= 128;
+      buffer += 128;
+    }
+    if(size > 0)
+    {
+      putbuf((char*)buffer, size);
+    }
+    noBytes = size;
+  }
+  else 
+  {
+     noBytes = 0;
+     struct file *file = curr->fileDir[fd];
+     noBytes = (int)file_write(file, buffer, size);
+  }
+  lock_release(&lock);
+  return noBytes;
+}
+
+void
+seek (int fd, unsigned position)
+{
+  if (fd < 0 || fd > 127)
+  {
+    exit(-1);
+  }
+  lock_acquire(&lock);
+  struct thread *curr = thread_current(); 
+  struct file *file = curr->fileDir[fd];
+  if (file == NULL)
+  {
+    lock_release(&lock);
+    exit(-1);
+  }
+  file_seek(file, position);
+  lock_release(&lock);
+}
+
+unsigned
+tell (int fd)
+{
+  if (fd < 0 || fd > 127)
+  {
+    return -1;
+  }
+  lock_acquire(&lock);
+  struct thread *curr = thread_current(); 
+  struct file *file = curr->fileDir[fd];
+  if (file == NULL)
+  {
+    lock_release(&lock);
+    return -1;
+  }
+  unsigned ret = file_tell(file);
+  lock_release(&lock);
+  return ret;
+}
+
+void 
+close (int fd)
+{
+  //checks for valid fd
+  if (fd < 2 || fd > 127)
+  {
+    return;
+  }
+  lock_acquire(&lock);
+  struct thread *curr = thread_current();
+  struct file *file = curr->fileDir[fd];
+  if (file == NULL)
+  {
+    lock_release(&lock);
+    return;
+  }
+  file_close(file);
+  curr->fileDir[fd] = NULL;
+  lock_release(&lock);
+}
+
+bool
+check_valid(char* cmd_line)
+{
+  struct thread *curr = thread_current();
+  if (cmd_line == NULL || !is_user_vaddr(cmd_line))
+  {
+    return false;
+  } 
+  else if (pagedir_get_page (curr->pagedir, cmd_line) == NULL)
+  {
+    return false;
+  }
+  return true;
 }

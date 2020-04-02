@@ -102,7 +102,9 @@ struct thread
     struct list children;
     struct semaphore c_sema1;
     struct semaphore c_sema2;
+    struct semaphore le_sema;
     int exit;
+    bool le_pass;
 
     //for write
     struct file *fileDir[128];
