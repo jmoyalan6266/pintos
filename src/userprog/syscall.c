@@ -7,6 +7,7 @@
 #include "threads/synch.h"
 #include "threads/vaddr.h"
 #include "devices/shutdown.h"
+#include "devices/input.h"
 #include "filesys/off_t.h"
 #include "filesys/file.h"
 #include "filesys/filesys.h"
@@ -22,7 +23,9 @@ bool remove (const char *file);
 void seek (int fd, unsigned position);
 unsigned tell (int fd);
 void close (int fd);
-int filesize (int fd)
+int read (int fd, void *buffer, unsigned size); 
+int open (const char *file);
+int filesize (int fd);
 struct lock lock;
 
 void
@@ -37,6 +40,10 @@ syscall_handler (struct intr_frame *f UNUSED)
 {
   //find out how to get syscall_no
   int* myEsp = f->esp;
+  int fd;
+  char* file;
+  void* buffer;
+  unsigned size;
   switch(*myEsp)
   {
     case SYS_HALT:
@@ -54,11 +61,11 @@ syscall_handler (struct intr_frame *f UNUSED)
       break;
     case SYS_WRITE:
       myEsp++;
-      int fd = *myEsp;
+      fd = *myEsp;
       myEsp++;
-      void* buffer = (void*)*myEsp;
+      buffer = (void*)*myEsp;
       myEsp++;
-      unsigned size = *myEsp;
+      size = *myEsp;
       f->eax = write (fd, buffer, size);
       break;
     case SYS_EXEC:
@@ -68,37 +75,51 @@ syscall_handler (struct intr_frame *f UNUSED)
       break;
     case SYS_CREATE:
       myEsp++;
-      char *file = (char *)*myEsp;
+      file = (char *)*myEsp;
       myEsp++;
       unsigned initial_size = *myEsp;
       f->eax = create(file, initial_size);
       break;
     case SYS_REMOVE:
       myEsp++;
-      char *file1 = (char *)*myEsp;
-      f->eax = remove(file1);
+      file = (char *)*myEsp;
+      f->eax = remove(file);
       break;
     case SYS_TELL:
       myEsp++;
-      int fd = *myEsp;
+      fd = *myEsp;
       f->eax = tell(fd);
       break;
     case SYS_SEEK:
       myEsp++;
-      int fd = *myEsp;
+      fd = *myEsp;
       myEsp++;
       unsigned position = *myEsp;
       seek(fd, position);
       break;
     case SYS_FILESIZE:
       myEsp++;
-      int fd = *myEsp;
+      fd = *myEsp;
       f->eax = filesize(fd);
       break;
     case SYS_CLOSE:
       myEsp++;
-      int fd = *myEsp;
+      fd = *myEsp;
       close(fd);
+      break;
+    case SYS_READ:
+      myEsp++;
+      fd = *myEsp;
+      myEsp++;
+      buffer = (void*)*myEsp;
+      myEsp++;
+      size = *myEsp;
+      f->eax = read (fd, buffer, size);
+      break;
+    case SYS_OPEN:
+      myEsp++;
+      file = (char*)*myEsp;
+      f->eax = open (file);
       break;
   }
   thread_exit ();
@@ -274,4 +295,71 @@ filesize (int fd)
   int retVal = (int)file_length(file);
   lock_release(&lock);
   return retVal;
+}
+
+int
+read (int fd, void* buffer, unsigned size)
+{
+  int noBytes = 0;
+  //checks to see if it is a valid address
+  if (!is_user_vaddr(buffer) || (fd < 0 || fd > 127))
+  {
+    exit(-1);
+  }
+  lock_acquire(&lock);
+  struct thread *curr = thread_current();
+  int i;
+  if(fd == 1)
+  {
+    for (i = 0; i < size; i++)
+    {
+      //TODO: what to do with input_getc()
+      input_getc();
+      noBytes++;
+    }
+  }
+  else 
+  {
+     struct file *file = curr->fileDir[fd];
+     noBytes = (int)file_read(file, buffer, size);
+  }
+  lock_release(&lock);
+  return noBytes;
+}
+
+int
+open (const char *file)
+{
+  bool notFound = 1;
+  int index = 2;
+  lock_acquire(&lock);
+  struct file *fp = filesys_open(file);
+  struct thread *curr = thread_current();
+  if (fp == NULL)
+  {
+    lock_release(&lock);
+    return -1;
+  }
+  else
+  {
+    while (notFound && index < 128)
+    {
+      if (curr->fileDir[index] != NULL)
+      {
+        index++;
+      }
+      else
+      {
+        notFound = 0;
+        curr->fileDir[index] = fp;
+      }
+    }
+  }
+  if (notFound)
+  {
+    lock_release(&lock);
+    return -1;
+  }
+  lock_release(&lock);
+  return index;
 }
