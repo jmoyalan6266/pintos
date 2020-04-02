@@ -9,6 +9,7 @@
 #include "devices/shutdown.h"
 #include "filesys/off_t.h"
 #include "filesys/file.h"
+#include "filesys/filesys.h"
 
 static void syscall_handler (struct intr_frame *);
 void halt (void);
@@ -18,6 +19,10 @@ void exit (int status);
 int wait (tid_t pid);
 bool create (const char *file, unsigned initial_size);
 bool remove (const char *file);
+void seek (int fd, unsigned position);
+unsigned tell (int fd);
+void close (int fd);
+int filesize (int fd)
 struct lock lock;
 
 void
@@ -58,22 +63,43 @@ syscall_handler (struct intr_frame *f UNUSED)
       break;
     case SYS_EXEC:
       myEsp++;
-      const char *cmd_line = *myEsp;
+      char *cmd_line = (char *)*myEsp;
       f->eax = exec(cmd_line);
       break;
     case SYS_CREATE:
       myEsp++;
-      const char *file = *myEsp;
+      char *file = (char *)*myEsp;
       myEsp++;
       unsigned initial_size = *myEsp;
       f->eax = create(file, initial_size);
       break;
     case SYS_REMOVE:
       myEsp++;
-      const char *file1 = *myEsp;
+      char *file1 = (char *)*myEsp;
       f->eax = remove(file1);
       break;
-
+    case SYS_TELL:
+      myEsp++;
+      int fd = *myEsp;
+      f->eax = tell(fd);
+      break;
+    case SYS_SEEK:
+      myEsp++;
+      int fd = *myEsp;
+      myEsp++;
+      unsigned position = *myEsp;
+      seek(fd, position);
+      break;
+    case SYS_FILESIZE:
+      myEsp++;
+      int fd = *myEsp;
+      f->eax = filesize(fd);
+      break;
+    case SYS_CLOSE:
+      myEsp++;
+      int fd = *myEsp;
+      close(fd);
+      break;
   }
   thread_exit ();
 }
@@ -141,6 +167,7 @@ exec (const char *cmd_line)
     return -1;
   }
   lock_release(&lock);
+  return tid;
 }
 
 void 
@@ -167,4 +194,84 @@ remove (const char *file)
   returnVal = filesys_remove(file);
   lock_release(&lock);
   return returnVal;
+}
+
+unsigned
+tell (int fd)
+{
+  if (fd < 0 || fd > 127)
+  {
+    return -1;
+  }
+  lock_acquire(&lock);
+  struct thread *curr = thread_current(); 
+  struct file *file = curr->fileDir[fd];
+  if (file == NULL)
+  {
+    lock_release(&lock);
+    return -1;
+  }
+  unsigned ret = file_tell(file);
+  lock_release(&lock);
+  return ret;
+}
+
+void
+seek (int fd, unsigned position)
+{
+  if (fd < 0 || fd > 127)
+  {
+    exit(-1);
+  }
+  lock_acquire(&lock);
+  struct thread *curr = thread_current(); 
+  struct file *file = curr->fileDir[fd];
+  if (file == NULL)
+  {
+    lock_release(&lock);
+    exit(-1);
+  }
+  file_seek(file, position);
+  lock_release(&lock);
+}
+
+void 
+close (int fd)
+{
+  //checks for valid fd
+  if (fd < 2 || fd > 127)
+  {
+    exit(-1);
+  }
+  lock_acquire(&lock);
+  struct thread *curr = thread_current();
+  struct file *file = curr->fileDir[fd];
+  if (file == NULL)
+  {
+    lock_release(&lock);
+    exit(-1);
+  }
+  file_close(file);
+  curr->fileDir[fd] = NULL;
+  lock_release(&lock);
+}
+
+int
+filesize (int fd)
+{
+  if (fd < 2 || fd > 127)
+  {
+    return -1;
+  }
+  lock_acquire(&lock);
+  struct thread *curr = thread_current();
+  struct file *file = curr->fileDir[fd];
+  if (file == NULL)
+  {
+    lock_release(&lock);
+    return -1;
+  }
+  int retVal = (int)file_length(file);
+  lock_release(&lock);
+  return retVal;
 }

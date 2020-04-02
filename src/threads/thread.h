@@ -105,7 +105,7 @@ struct thread
     int exit;
 
     //for write
-    char *fileDir[128];
+    struct file *fileDir[128];
 
 
 #ifdef USERPROG

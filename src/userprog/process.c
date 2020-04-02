@@ -113,7 +113,7 @@ process_wait (tid_t child_tid)
   c_exit = child->exit;
   //unblocks any zombie children
   //remove from list
-  list_remove (&e);
+  list_remove (e);
   sema_up(&(child->c_sema2));
   return c_exit;
 }
