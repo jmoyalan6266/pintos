@@ -58,16 +58,11 @@ is_user_vaddr (const void *vaddr)
 {
   // Sahithi drove here
   // check if NULL pointer, or above phys_base, or below code segment
-  // are we supposed to call page fault ????
   if (vaddr == NULL) {
     return false;
   } else if (vaddr >= PHYS_BASE) {
     return false;
-    // should we pass in this number
   } 
-  // else if (vaddr < (void*) 0x08048000) {
-  //   return false;
-  // }
   return true;
 }
 

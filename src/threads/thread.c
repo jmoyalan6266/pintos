@@ -183,6 +183,7 @@ thread_create (const char *name, int priority,
   init_thread (t, name, priority);
   tid = t->tid = allocate_tid ();
 
+  // Pranay drove here
   /*add to children list*/
   struct thread *curr = thread_current();
   list_push_back (&curr->children, &t->c_elem);
@@ -287,6 +288,8 @@ void
 thread_exit (void)
 {
   ASSERT (!intr_context ());
+
+  // Pranay and Ashish drove here
   struct list_elem *e;
   struct thread *curr = thread_current();
   //gets parent thread
@@ -485,6 +488,7 @@ init_thread (struct thread *t, const char *name, int priority)
   t->priority = priority;
   t->magic = THREAD_MAGIC;
 
+  // Pranah drove here
   sema_init(&(t->c_sema1), 0);
   sema_init(&(t->c_sema2), 0);
   list_init (&t->children);

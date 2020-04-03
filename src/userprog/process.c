@@ -37,23 +37,11 @@ process_execute (const char *file_name)
   fn_copy = palloc_get_page (0);
   if (fn_copy == NULL)
     return TID_ERROR;
-  strlcpy (fn_copy, file_name, PGSIZE);
-
-  // synchonize load and exectute
-  // plan to use semaphores to lock it
-  // do we needa add it to thread struct
-  
+  strlcpy (fn_copy, file_name, PGSIZE);  
 
   /* Create a new thread to execute FILE_NAME. */
   tid = thread_create (file_name, PRI_DEFAULT, start_process, fn_copy);
   
-  // struct thread *curr = thread_current();
-  // sema_down(&curr->le_sema);
-  // if (!curr->le_pass)
-  // {
-  //   return -1;
-  // }
-
   if (tid == TID_ERROR)
     palloc_free_page (fn_copy);
   return tid;
@@ -75,6 +63,8 @@ start_process (void *file_name_)
   if_.cs = SEL_UCSEG;
   if_.eflags = FLAG_IF | FLAG_MBS;
   success = load (file_name, &if_.eip, &if_.esp);
+  // boolean to check if process started successfully
+  // unblock the semaphore
   curr->le_pass = success;
   sema_up(&curr->le_sema);
 
@@ -112,6 +102,7 @@ process_wait (tid_t child_tid)
   struct thread *curr = thread_current();
   struct list_elem *e;
   struct thread *child;
+  // Pranay drove here
   //check to see if child with given tid exists
   for (e = list_begin (&curr->children); e != list_end (&curr->children); e = list_next (e))
     {
@@ -124,6 +115,7 @@ process_wait (tid_t child_tid)
   if (e == list_end (&curr->children)) {
     return -1;
   }
+  // Ashish drove here
   //blocks until child exits
   sema_down(&(child->c_sema1));
   c_exit = child->exit;
@@ -157,6 +149,8 @@ process_exit (void)
       pagedir_activate (NULL);
       pagedir_destroy (pd);
     }
+  // Joseph drove here
+  // closes the executable
   file_close(cur->executableN);
 }
 
@@ -370,6 +364,7 @@ load (const char *file_name, void (**eip) (void), void **esp)
   *eip = (void (*) (void)) ehdr.e_entry;
 
   success = true;
+  // Joseph drove here
   t->executableN = file;
   file_deny_write(file);
 
@@ -547,6 +542,7 @@ setup_stack (void **esp, char *filename)
         index++;
         memcpy (myEsp, token, tokenlen);
       }
+    // Joseph drove here
     // check num bytes added to see if we need to align
     int align = (unsigned int) myEsp % 4;
     if (align != 0)
@@ -568,7 +564,8 @@ setup_stack (void **esp, char *filename)
     numargs = index;
     // fence post: drecrement
     index--;
-
+    
+    // Joseph drove here
     while (index >= 0)
       {
         size -= sizeof(char*);
@@ -584,6 +581,7 @@ setup_stack (void **esp, char *filename)
     // check size of last 3 pushes onto stack
     // always a char ptr, int, void ptr
 
+    // Pranay drove here
     size -= (sizeof(char*) + sizeof(int) + sizeof(void*));
     if (size < 0) {
       return false;

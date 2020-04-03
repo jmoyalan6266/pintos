@@ -148,7 +148,7 @@ page_fault (struct intr_frame *f)
   write = (f->error_code & PF_W) != 0;
   user = (f->error_code & PF_U) != 0;
   //Joseph Drove here
-  //Check for reads,writes, and jumps
+  //Check for reads, writes, and jumps
   if(!write || (!not_present && user) || not_present)
   {
      exit(-1);
