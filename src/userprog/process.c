@@ -7,6 +7,7 @@
 #include <string.h>
 #include "userprog/gdt.h"
 #include "userprog/pagedir.h"
+#include "userprog/syscall.h"
 #include "userprog/tss.h"
 #include "filesys/directory.h"
 #include "filesys/file.h"
@@ -149,9 +150,6 @@ process_exit (void)
       pagedir_activate (NULL);
       pagedir_destroy (pd);
     }
-  // Joseph drove here
-  // closes the executable
-  file_close(cur->executableN);
 }
 
 /* Sets up the CPU for running user code in the current
@@ -268,7 +266,9 @@ load (const char *file_name, void (**eip) (void), void **esp)
   char *save;
   char *temp = strtok_r (fn_copy2, " ", &save);
   /* Open executable file. */
+  lock_acquire(&lock);
   file = filesys_open (temp);
+  lock_release(&lock);
   if (file == NULL)
     {
       printf ("load: %s: open failed\n", file_name);
@@ -542,7 +542,6 @@ setup_stack (void **esp, char *filename)
         index++;
         memcpy (myEsp, token, tokenlen);
       }
-    // Joseph drove here
     // check num bytes added to see if we need to align
     int align = (unsigned int) myEsp % 4;
     if (align != 0)

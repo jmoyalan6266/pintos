@@ -289,9 +289,10 @@ thread_exit (void)
 {
   ASSERT (!intr_context ());
 
-  // Pranay and Ashish drove here
+  // Sahithi drove here
   struct list_elem *e;
   struct thread *curr = thread_current();
+  file_close(curr->executableN);
   //gets parent thread
   //unblocks parent thread
   sema_up(&(curr->c_sema1));

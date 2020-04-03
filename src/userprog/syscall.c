@@ -30,7 +30,6 @@ int read (int fd, void *buffer, unsigned size);
 int open (const char *file);
 int filesize (int fd);
 // lock to block calls to filesys
-struct lock lock;
 
 // helper method to check for valid user address
 bool check_valid(char* cmd_line);
