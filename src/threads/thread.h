@@ -102,9 +102,13 @@ struct thread
     struct list children;
     struct semaphore c_sema1;
     struct semaphore c_sema2;
-    struct semaphore le_sema;
-    int exit;
+    //synchronizes load and exec
     bool le_pass;
+    struct semaphore le_sema;
+    //stores exit status
+    int exit;
+    //stores executable
+    struct file *executableN;
 
     //for write
     struct file *fileDir[128];
