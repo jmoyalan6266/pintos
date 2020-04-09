@@ -105,6 +105,7 @@ struct thread
     //synchronizes load and exec
     bool le_pass;
     struct semaphore le_sema;
+    struct thread *parent;
     //stores exit status
     int exit;
     //stores executable

@@ -187,8 +187,8 @@ exec (const char *cmd_line)
   // Joseph and Pranay drove here
   // use semaphore to synchronize load and exec
   tid_t tid = process_execute(cmd_line);
-  struct thread *curr = thread_current();
-  sema_down(&curr->le_sema);
+  /*struct thread *curr = thread_current();
+  //sema_down(&curr->le_sema);
   if (!curr->le_pass)
   {
     return -1;
@@ -196,7 +196,7 @@ exec (const char *cmd_line)
   if(tid == TID_ERROR)
   {
     return -1;
-  }
+  }*/
   return tid;
 }
 

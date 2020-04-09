@@ -39,10 +39,14 @@ process_execute (const char *file_name)
   if (fn_copy == NULL)
     return TID_ERROR;
   strlcpy (fn_copy, file_name, PGSIZE);  
-
   /* Create a new thread to execute FILE_NAME. */
   tid = thread_create (file_name, PRI_DEFAULT, start_process, fn_copy);
-  
+  struct thread *curr = thread_current();
+  sema_down(&curr->le_sema);
+  if (!curr->le_pass)
+  {
+    return -1;
+  }
   if (tid == TID_ERROR)
     palloc_free_page (fn_copy);
   return tid;
@@ -57,7 +61,6 @@ start_process (void *file_name_)
   struct intr_frame if_;
   bool success;
   struct thread *curr = thread_current();
-
   /* Initialize interrupt frame and load executable. */
   memset (&if_, 0, sizeof if_);
   if_.gs = if_.fs = if_.es = if_.ds = if_.ss = SEL_UDSEG;
@@ -66,8 +69,8 @@ start_process (void *file_name_)
   success = load (file_name, &if_.eip, &if_.esp);
   // boolean to check if process started successfully
   // unblock the semaphore
-  curr->le_pass = success;
-  sema_up(&curr->le_sema);
+  curr->parent->le_pass = success;
+  sema_up(&curr->parent->le_sema);
 
   /* If load failed, quit. */
   palloc_free_page (file_name);

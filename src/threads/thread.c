@@ -187,6 +187,7 @@ thread_create (const char *name, int priority,
   /*add to children list*/
   struct thread *curr = thread_current();
   list_push_back (&curr->children, &t->c_elem);
+  t->parent = curr;
 
 
   /* Stack frame for kernel_thread(). */
@@ -494,6 +495,7 @@ init_thread (struct thread *t, const char *name, int priority)
   sema_init(&(t->c_sema2), 0);
   list_init (&t->children);
   sema_init (&t->le_sema, 0);
+  t->parent = NULL;
 
   old_level = intr_disable();
   list_push_back (&all_list, &t->allelem);
